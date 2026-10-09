@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Superhero City Rescue</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:system-ui,Arial,sans-serif;touch-action:none}
+  #game{position:fixed;inset:0}
+  #hud{position:fixed;left:10px;top:10px;color:white;text-shadow:0 2px 4px #000;background:#071321a8;padding:10px 12px;border-radius:12px;max-width:75%;font-size:14px;z-index:3}
+  #mission{font-weight:700;color:#ffe66d}
+  #help{font-size:12px;opacity:.95;margin-top:4px}
+  #joystick{position:fixed;left:22px;bottom:26px;width:116px;height:116px;border-radius:50%;background:#ffffff33;border:2px solid #ffffff88;z-index:4;touch-action:none}
+  #stick{position:absolute;left:34px;top:34px;width:44px;height:44px;border-radius:50%;background:#fff9;border:2px solid white}
+  .btn{position:fixed;z-index:4;right:22px;width:68px;height:68px;border-radius:50%;border:2px solid #fff;background:#e63e4fce;color:white;font-weight:800;font-size:12px;box-shadow:0 3px 8px #0005;touch-action:none}
+  #jump{bottom:32px} #action{bottom:112px;background:#167bd8d9}
+  #message{position:fixed;left:50%;top:48%;transform:translate(-50%,-50%);padding:12px 18px;background:#061322df;color:#fff;border-radius:14px;font-weight:700;z-index:5;display:none;text-align:center;width:max-content;max-width:85%}
+  #start{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:linear-gradient(#071b38cc,#061321e8);color:white;text-align:center;padding:24px}
+  #startCard{max-width:420px;background:#132a43;border:1px solid #ffffff40;border-radius:20px;padding:22px}
+  #start h1{margin:0 0 8px;color:#ffe66d;font-size:27px}
+  #start p{line-height:1.5}
+  #start button{border:0;border-radius:12px;background:#ff4055;color:white;font-weight:800;font-size:18px;padding:13px 26px}
+  #desktopHint{position:fixed;right:10px;top:10px;color:#fff;background:#071321a8;padding:8px 10px;border-radius:10px;font-size:12px;z-index:3}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+  <div><b>🦸 SUPERHERO CITY</b></div>
+  <div id="mission">Mission: Rescue the citizen</div>
+  <div id="status">Citizen: city square ke paas</div>
+  <div id="help">Joystick se chalen • JUMP se kooden • RESCUE dabayen</div>
+</div>
+<div id="desktopHint">PC: WASD / arrows • Space jump • E rescue</div>
+<div id="joystick"><div id="stick"></div></div>
+<button class="btn" id="jump">JUMP</button>
+<button class="btn" id="action">RESCUE</button>
+<div id="message"></div>
+<div id="start">
+  <div id="startCard">
+    <h1>SUPERHERO CITY RESCUE</h1>
+    <p>Apne superhero ko city mein chalao, ramp par jump karo aur neele kapde wale citizen ko rescue karo.</p>
+    <p><b>Controls:</b> left joystick = move, JUMP = jump, RESCUE = mission action.</p>
+    <button id="play">GAME START</button>
+    <p style="font-size:12px;opacity:.8">First prototype • Internet required to load 3D engine</p>
+  </div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const root=document.getElementById('game');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x8bd2ff);
+scene.fog=new THREE.Fog(0x8bd2ff,65,190);
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,0.1,350);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x64728b,2.0));
+const sun=new THREE.DirectionalLight(0xffffff,2.0); sun.position.set(-30,60,25); sun.castShadow=true; sun.shadow.mapSize.set(1024,1024); scene.add(sun);
+
+const mat=(c,rough=.85)=>new THREE.MeshStandardMaterial({color:c,roughness:rough});
+const groundMat=mat(0x55a65b), roadMat=mat(0x343b46), lineMat=mat(0xf4e6a0), sidewalkMat=mat(0xb9bec5);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(240,240),groundMat); ground.rotation.x=-Math.PI/2; ground.position.y=-.12; ground.receiveShadow=true; scene.add(ground);
+function box(w,h,d,m,x,y,z){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o}
+box(12,.12,180,roadMat,0,0,-4); box(180,.12,12,roadMat,4,0,0);
+for(let z=-88;z<=82;z+=8){box(.14,.02,2.5,lineMat,0,.08,z)}
+for(let x=-84;x<=88;x+=8){box(2.5,.02,.14,lineMat,x,.08,0)}
+// Sidewalks
+box(16,.16,2,sidewalkMat,0,.02,-13);box(16,.16,2,sidewalkMat,0,.02,5);
+box(2,.16,16,sidewalkMat,-13,.02,0);box(2,.16,16,sidewalkMat,5,.02,0);
+// City blocks with colorful buildings, windows
+const buildingColors=[0xd8e1e8,0xe6c6a6,0xb9cbe0,0xd9d6c8,0xb5d3c6,0xc7b7d8];
+for(let gx=-4;gx<=4;gx++)for(let gz=-4;gz<=4;gz++){
+  if(Math.abs(gx)<=1||Math.abs(gz)<=1)continue;
+  const x=gx*19+(Math.random()-.5)*3,z=gz*19+(Math.random()-.5)*3;
+  const w=8+Math.random()*4,d=8+Math.random()*4,h=7+Math.random()*23;
+  const b=box(w,h,d,mat(buildingColors[Math.floor(Math.random()*buildingColors.length)]),x,h/2,z);
+  // roof edge
+  box(w+.12,.25,d+.12,mat(0x697583),x,h+.12,z);
+  const winMat=mat(0x8bd7ee,.35);
+  for(let yy=2;yy<h-1;yy+=2.6){
+    for(let xx=-w/2+1.2;xx<w/2-0.5;xx+=2.2){
+      for(const side of [-1,1]) box(.85,.95,.07,winMat,x+xx,yy,z+side*(d/2+.04));
+    }
+  }
+}
+// Ramp
+const rampMat=mat(0xff7b28);
+const ramp= new THREE.Mesh(new THREE.BoxGeometry(5,.5,10),rampMat);
+ramp.position.set(-8,.75,-20); ramp.rotation.x=-.28; ramp.rotation.z=-.05; ramp.castShadow=true; ramp.receiveShadow=true; scene.add(ramp);
+box(5,.25,1,mat(0xffd65a),-8,.35,-25);
+// Cars
+function makeCar(x,z,color,rot=0){
+ const g=new THREE.Group();g.position.set(x,.45,z);g.rotation.y=rot;
+ const body=new THREE.Mesh(new THREE.BoxGeometry(2.2,.7,4),mat(color));body.position.y=.25;body.castShadow=true;g.add(body);
+ const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.55,.72,1.8),mat(0x9ed8f0,.35));cabin.position.set(0,.85,-.15);cabin.castShadow=true;g.add(cabin);
+ const wheelMat=mat(0x17191d);
+ for(const xx of [-1.08,1.08])for(const zz of [-1.25,1.25]){const wh=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,.22,12),wheelMat);wh.rotation.z=Math.PI/2;wh.position.set(xx,-.08,zz);g.add(wh)}
+ scene.add(g);return g;
+}
+const cars=[makeCar(4,-8,0xe84242,Math.PI/2),makeCar(-5,7,0x2878d0,0),makeCar(14,3,0xf3bf32,Math.PI/2)];
+// Hero: original red/blue masked superhero made from geometry
+const hero=new THREE.Group(); scene.add(hero);
+const blue=mat(0x123dba),red=mat(0xe6283b),dark=mat(0x20263a),white=mat(0xffffff,.4);
+function hmesh(geo,m,x,y,z){const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;hero.add(o);return o}
+hmesh(new THREE.CylinderGeometry(.43,.5,1.05,10),blue,0,1.05,0);
+hmesh(new THREE.SphereGeometry(.36,14,12),red,0,1.85,0);
+hmesh(new THREE.SphereGeometry(.13,10,8),white,-.16,1.9,.29).scale.set(1,.5,.3);
+hmesh(new THREE.SphereGeometry(.13,10,8),white,.16,1.9,.29).scale.set(1,.5,.3);
+hmesh(new THREE.BoxGeometry(.23,.85,.28),red,-.57,1.15,0).rotation.z=-.18;
+hmesh(new THREE.BoxGeometry(.23,.85,.28),red,.57,1.15,0).rotation.z=.18;
+hmesh(new THREE.BoxGeometry(.28,.8,.32),blue,-.22,.38,0);
+hmesh(new THREE.BoxGeometry(.28,.8,.32),blue,.22,.38,0);
+hmesh(new THREE.BoxGeometry(.22,.24,.06),white,0,1.13,.47);
+hero.position.set(0,0,12);
+// Citizen to rescue
+const citizen=new THREE.Group();scene.add(citizen);citizen.position.set(7,0,-17);
+const cm=mat(0x197bd2),skin=mat(0xf0bd91),pants=mat(0x333d59);
+const cbody=new THREE.Mesh(new THREE.CylinderGeometry(.35,.42,.9,10),cm);cbody.position.y=.9;citizen.add(cbody);
+const chead=new THREE.Mesh(new THREE.SphereGeometry(.29,12,10),skin);chead.position.y=1.55;citizen.add(chead);
+const cleg1=new THREE.Mesh(new THREE.BoxGeometry(.22,.6,.24),pants);cleg1.position.set(-.17,.3,0);citizen.add(cleg1);
+const cleg2=cleg1.clone();cleg2.position.x=.17;citizen.add(cleg2);
+const ring=new THREE.Mesh(new THREE.TorusGeometry(.85,.09,8,24),mat(0xffdf45));ring.rotation.x=Math.PI/2;ring.position.y=.12;citizen.add(ring);
+// trees
+for(let i=0;i<35;i++){let x=(Math.random()-.5)*150,z=(Math.random()-.5)*150;if(Math.abs(x)<10||Math.abs(z)<10)continue;const trunk=box(.5,2,.5,mat(0x775033),x,1,z);const top=new THREE.Mesh(new THREE.SphereGeometry(1.6,8,7),mat(0x287b42));top.position.set(x,3,z);top.castShadow=true;scene.add(top)}
+let running=false,velY=0,onGround=true,missionDone=false;
+const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.code==='Space')jump()});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+const joy=document.getElementById('joystick'),stick=document.getElementById('stick');
+let joyOn=false,joyId=null,joyX=0,joyY=0;
+function setJoy(e){const r=joy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=36;const len=Math.hypot(dx,dy)||1;if(len>max){dx=dx/len*max;dy=dy/len*max}joyX=dx/max;joyY=dy/max;stick.style.left=(34+dx)+'px';stick.style.top=(34+dy)+'px'}
+joy.addEventListener('pointerdown',e=>{joyOn=true;joyId=e.pointerId;joy.setPointerCapture(e.pointerId);setJoy(e)});
+joy.addEventListener('pointermove',e=>{if(joyOn&&e.pointerId===joyId)setJoy(e)});
+function resetJoy(){joyOn=false;joyX=joyY=0;stick.style.left='34px';stick.style.top='34px'}
+joy.addEventListener('pointerup',resetJoy);joy.addEventListener('pointercancel',resetJoy);
+function jump(){if(onGround&&running){velY=8.5;onGround=false}}
+document.getElementById('jump').addEventListener('pointerdown',e=>{e.preventDefault();jump()});
+const msg=document.getElementById('message');let msgTimer;
+function showMsg(t){msg.textContent=t;msg.style.display='block';clearTimeout(msgTimer);msgTimer=setTimeout(()=>msg.style.display='none',2600)}
+function rescue(){if(!running)return;const dist=hero.position.distanceTo(citizen.position);if(dist<4){missionDone=true;citizen.visible=false;document.getElementById('mission').textContent='Mission complete! ⭐';document.getElementById('status').textContent='Citizen rescued — well done!';showMsg('MISSION COMPLETE! Citizen rescued!')}else showMsg('Citizen ke paas jaakar RESCUE dabayen!')}
+document.getElementById('action').addEventListener('pointerdown',e=>{e.preventDefault();rescue()});
+document.getElementById('play').onclick=()=>{document.getElementById('start').style.display='none';running=true;showMsg('Citizen ke paas jao: neela character, ring ke andar!')};
+const clock=new THREE.Clock();
+function update(dt){
+ if(!running)return;
+ let ix=joyX,iy=joyY;
+ if(keys.a||keys.arrowleft)ix=-1;if(keys.d||keys.arrowright)ix=1;
+ if(keys.w||keys.arrowup)iy=-1;if(keys.s||keys.arrowdown)iy=1;
+ if(keys.e) {keys.e=false;rescue()}
+ const moving=Math.hypot(ix,iy)>.08;
+ if(moving){
+  const forward=new THREE.Vector3(ix,0,iy).normalize();
+  hero.position.x+=forward.x*8*dt;hero.position.z+=forward.z*8*dt;
+  hero.rotation.y=Math.atan2(forward.x,forward.z);
+  // arm swing
+  hero.children[5].rotation.z=-.18+Math.sin(clock.elapsedTime*12)*.3;
+  hero.children[6].rotation.z=.18-Math.sin(clock.elapsedTime*12)*.3;
+ }
+ velY-=19*dt;hero.position.y+=velY*dt;
+ if(hero.position.y<=0){hero.position.y=0;velY=0;onGround=true}
+ hero.position.x=THREE.MathUtils.clamp(hero.position.x,-100,100);hero.position.z=THREE.MathUtils.clamp(hero.position.z,-100,100);
+ // camera follows hero from behind
+ const desired=new THREE.Vector3(hero.position.x,hero.position.y+6,hero.position.z+10);
+ camera.position.lerp(desired,1-Math.pow(.001,dt));camera.lookAt(hero.position.x,hero.position.y+1.1,hero.position.z);
+ // update citizen status
+ if(!missionDone){const d=hero.position.distanceTo(citizen.position);document.getElementById('status').textContent=d<4?'Citizen nearby — RESCUE dabayen':'Citizen se distance: '+Math.round(d)+' m'}
+}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);update(dt);renderer.render(scene,camera)}
+camera.position.set(0,6,22);camera.lookAt(0,1,12);animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>
